@@ -5,7 +5,6 @@ FROM node:22.12.0-alpine AS base
 WORKDIR /app
 
 # Ensure libc6-compat is available for some Node.js modules
-# This is good practice for Alpine-based Node.js images with certain native modules.
 RUN apk add --no-cache libc6-compat
 
 FROM base AS deps
@@ -14,15 +13,15 @@ FROM base AS deps
 COPY package.json pnpm-lock.yaml* ./
 
 # Disable Corepack's strict signature verification for package manager binaries.
-# This ENV variable must be set BEFORE any corepack commands that might trigger validation.
 ENV COREPACK_ENABLE_STRICT=0
 
-RUN \
-  # Explicitly prepare (download if necessary) the desired pnpm version.
-  # This makes sure the binary is available. Replace 9.4.0 with your preferred pnpm v9/v10 version.
-  corepack prepare pnpm@9.4.0 --activate && \
-  # Now that pnpm is prepared and activated, install dependencies
-  pnpm install --frozen-lockfile
+# STEP 1: Prepare and activate pnpm. This ensures the pnpm binary is available globally.
+# We're splitting this from the install command.
+RUN corepack prepare pnpm@9.4.0 --activate
+
+# STEP 2: Now that pnpm is prepared and activated, run the install command.
+# This runs in a new shell session where pnpm should be in the PATH.
+RUN pnpm install --frozen-lockfile
 
 # Build application
 FROM base AS builder
@@ -36,13 +35,13 @@ COPY . .
 ENV NEXT_TELEMETRY_DISABLED 1
 
 # Re-ensure COREPACK_ENABLE_STRICT is set for the builder stage as well.
-# It's good practice to set it in each stage where Corepack might be invoked implicitly or explicitly.
 ENV COREPACK_ENABLE_STRICT=0
 
-RUN \
-  # Re-prepare and activate pnpm for the build step.
-  corepack prepare pnpm@9.4.0 --activate && \
-  pnpm build
+# STEP 1 (Builder stage): Prepare and activate pnpm again.
+RUN corepack prepare pnpm@9.4.0 --activate
+
+# STEP 2 (Builder stage): Now, run the build command.
+RUN pnpm build
 
 # Create minimal runtime image
 FROM node:22.12.0-alpine AS runner
@@ -61,7 +60,6 @@ RUN addgroup --system --gid 1001 nodejs && \
 COPY --from=builder /app/public ./public
 
 # Set up Next.js standalone build output
-# Ensure correct ownership for the non-root user
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
