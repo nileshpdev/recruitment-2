@@ -15,13 +15,10 @@ COPY package.json pnpm-lock.yaml* ./
 # Disable Corepack's strict signature verification for package manager binaries.
 ENV COREPACK_ENABLE_STRICT=0
 
-# STEP 1: Prepare and activate pnpm. This ensures the pnpm binary is available globally.
-# We're splitting this from the install command.
-RUN corepack prepare pnpm@9.4.0 --activate
-
-# STEP 2: Now that pnpm is prepared and activated, run the install command.
-# This runs in a new shell session where pnpm should be in the PATH.
-RUN pnpm install --frozen-lockfile
+# COMBINED STEP: Prepare pnpm AND install dependencies in the same RUN command.
+# This ensures pnpm is in the PATH when 'pnpm install' is called.
+RUN corepack prepare pnpm@9.4.0 --activate && \
+    pnpm install --frozen-lockfile
 
 # Build application
 FROM base AS builder
