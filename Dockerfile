@@ -14,13 +14,14 @@ FROM base AS deps
 COPY package.json pnpm-lock.yaml* ./
 
 # Disable Corepack's strict signature verification for package manager binaries.
-# This helps with the "Cannot find matching keyid" error.
+# This ENV variable must be set BEFORE any corepack commands that might trigger validation.
 ENV COREPACK_ENABLE_STRICT=0
 
 RUN \
-  # Enable pnpm explicitly with a specific version as recommended by package.json.
-  # Using 'pnpm@9.4.0' as an example. Adjust if your project demands a different v9.x or v10.x version.
-  corepack enable pnpm@9.4.0 && \
+  # Explicitly prepare (download if necessary) the desired pnpm version.
+  # This makes sure the binary is available. Replace 9.4.0 with your preferred pnpm v9/v10 version.
+  corepack prepare pnpm@9.4.0 --activate && \
+  # Now that pnpm is prepared and activated, install dependencies
   pnpm install --frozen-lockfile
 
 # Build application
@@ -34,10 +35,13 @@ COPY . .
 # Disable Next.js telemetry during build (optional but recommended for production builds)
 ENV NEXT_TELEMETRY_DISABLED 1
 
-# Re-enable pnpm explicitly in the builder stage to ensure consistency
+# Re-ensure COREPACK_ENABLE_STRICT is set for the builder stage as well.
+# It's good practice to set it in each stage where Corepack might be invoked implicitly or explicitly.
 ENV COREPACK_ENABLE_STRICT=0
+
 RUN \
-  corepack enable pnpm@9.4.0 && \
+  # Re-prepare and activate pnpm for the build step.
+  corepack prepare pnpm@9.4.0 --activate && \
   pnpm build
 
 # Create minimal runtime image
