@@ -14,13 +14,13 @@ COPY package.json yarn.lock* package-lock.json* pnpm-lock.yaml* ./
 ENV COREPACK_ENABLE_STRICT=0
 
 RUN \
+  # Clean Corepack cache to refresh integrity data
+  corepack cache clean && \
   if [ -f yarn.lock ]; then corepack enable yarn && yarn install --frozen-lockfile; \
   elif [ -f package-lock.json ]; then npm ci; \
   elif [ -f pnpm-lock.yaml ]; then corepack enable pnpm && pnpm install --frozen-lockfile; \
   else echo "No lockfile found." && exit 1; \
   fi
-
-
 
 # Build application
 FROM base AS builder
@@ -35,6 +35,8 @@ ENV NEXT_TELEMETRY_DISABLED 1
 ENV COREPACK_ENABLE_STRICT=0
 
 RUN \
+  # Clean Corepack cache here too, for consistency
+  corepack cache clean && \
   if [ -f yarn.lock ]; then corepack enable yarn && yarn install --frozen-lockfile; \
   elif [ -f pnpm-lock.yaml ]; then corepack enable pnpm && pnpm install --frozen-lockfile; \
   else echo "No lockfile found." && exit 1; \
