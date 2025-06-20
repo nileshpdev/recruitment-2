@@ -7,18 +7,20 @@ WORKDIR /app
 # Ensure libc6-compat is available for some Node.js modules
 RUN apk add --no-cache libc6-compat
 
-# Install dependencies
 FROM base AS deps
 
 COPY package.json yarn.lock* package-lock.json* pnpm-lock.yaml* ./
 
-# Install based on lockfile present
+ENV COREPACK_ENABLE_STRICT=0
+
 RUN \
-  if [ -f yarn.lock ]; then yarn install --frozen-lockfile; \
+  if [ -f yarn.lock ]; then corepack enable yarn && yarn install --frozen-lockfile; \
   elif [ -f package-lock.json ]; then npm ci; \
   elif [ -f pnpm-lock.yaml ]; then corepack enable pnpm && pnpm install --frozen-lockfile; \
   else echo "No lockfile found." && exit 1; \
   fi
+
+
 
 # Build application
 FROM base AS builder
@@ -30,6 +32,8 @@ COPY . .
 ENV NEXT_TELEMETRY_DISABLED 1
 
 # Ensure dependencies are reinstalled correctly (helps in CI environments)
+ENV COREPACK_ENABLE_STRICT=0
+
 RUN \
   if [ -f yarn.lock ]; then corepack enable yarn && yarn install --frozen-lockfile; \
   elif [ -f pnpm-lock.yaml ]; then corepack enable pnpm && pnpm install --frozen-lockfile; \
