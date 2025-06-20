@@ -20,7 +20,6 @@ ENV COREPACK_ENABLE_STRICT=0
 RUN corepack prepare pnpm@9.4.0 --activate && \
     pnpm install --frozen-lockfile
 
-# Build application
 FROM base AS builder
 
 # Copy node_modules from the 'deps' stage
@@ -34,11 +33,9 @@ ENV NEXT_TELEMETRY_DISABLED 1
 # Re-ensure COREPACK_ENABLE_STRICT is set for the builder stage as well.
 ENV COREPACK_ENABLE_STRICT=0
 
-# STEP 1 (Builder stage): Prepare and activate pnpm again.
-RUN corepack prepare pnpm@9.4.0 --activate
-
-# STEP 2 (Builder stage): Now, run the build command.
-RUN pnpm build
+# COMBINED STEP (Builder stage): Prepare pnpm AND run the build command.
+RUN corepack prepare pnpm@9.4.0 --activate && \
+    pnpm build
 
 # Create minimal runtime image
 FROM node:22.12.0-alpine AS runner
